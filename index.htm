@@ -5,45 +5,85 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Lottery Generator</title>
   <style>
-    body { font-family: Arial, sans-serif; padding: 20px; }
-    textarea { width: 100%; height: 100px; }
-    .result { margin-top: 20px; font-weight: bold; }
+    body {
+      font-family: sans-serif;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+      box-sizing: border-box;
+    }
+    h1 {
+      text-align: center;
+    }
+    label, textarea, input {
+      display: block;
+      margin-bottom: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    textarea {
+      height: 100px;
+    }
+    button {
+      padding: 10px 15px;
+      margin-top: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    #output {
+      margin-top: 20px;
+      font-weight: bold;
+      text-align: center;
+    }
+    @media (max-width: 600px) {
+      input, textarea, button {
+        font-size: 1.1em;
+      }
+    }
   </style>
 </head>
 <body>
   <h1>Lottery Generator</h1>
-  <label>Range (Floor to Ceiling):</label><br>
-  <input type="number" id="floor" placeholder="Floor" />
-  <input type="number" id="ceiling" placeholder="Ceiling" /><br><br>
 
-  <label>Number of draws:</label><br>
-  <input type="number" id="numDraws" /><br><br>
+  <label>Range (Floor - Ceiling):</label>
+  <input id="floor" type="number" placeholder="e.g., 1" value="1" />
+  <input id="ceiling" type="number" placeholder="e.g., 49" value="49" />
 
-  <label><input type="checkbox" id="allowRepeats" /> Allow Repeats</label><br>
-  <label><input type="checkbox" id="skipHistory" /> Skip Historical Combinations</label><br>
-  <label><input type="checkbox" id="useLuckyProb" /> Use Lucky Number Probability</label><br><br>
+  <label>Number of Draws (N):</label>
+  <input id="numDraws" type="number" value="6" />
 
-  <label>Historical Winning Combinations (comma-separated):</label><br>
-  <textarea id="history"></textarea><br><br>
+  <label><input type="checkbox" id="allowRepeats" /> Allow repeats</label>
+  <label><input type="checkbox" id="skipHistory" /> Skip historical combinations</label>
+  <label><input type="checkbox" id="useLuckyProb" /> Use lucky/unlucky probabilities</label>
 
-  <button onclick="generateNumbers()">Generate</button>
+  <label>Historical Combinations:</label>
+  <textarea id="historyInput"></textarea>
 
-  <div class="result" id="result"></div>
+  <button onclick="generate()">Generate</button>
+
+  <div id="output"></div>
 
   <script>
     const luckyNumbers = [28, 16, 39, 32, 15];
     const unluckyNumbers = [47, 46, 43, 41, 44];
 
-    function parseHistory(input) {
-      return input.trim().split('\n').map(line =>
-        line.split(',').map(n => parseInt(n.trim())).sort((a, b) => a - b).join(',')
-      );
-    }
+    // Load default history.txt if present
+    window.onload = function () {
+      fetch('history.txt')
+        .then(res => res.text())
+        .then(data => {
+          document.getElementById('historyInput').value = data.trim();
+        })
+        .catch(() => {
+          console.log('No history.txt found, using blank history.');
+        });
+    };
 
     function generateWeightedNumbers(floor, ceiling, useLuckyProb) {
       const weights = [];
+      let numbers_in_range = ceiling - floor + 1;
       for (let i = floor; i <= ceiling; i++) {
-        let weight = 1;
+        let weight = 100 / numbers_in_range;
         if (useLuckyProb) {
           if (luckyNumbers.includes(i)) weight *= 1.2;
           if (unluckyNumbers.includes(i)) weight *= 0.7;
@@ -53,45 +93,57 @@
       return weights;
     }
 
-    function weightedRandom(weights) {
-      const totalWeight = weights.reduce((sum, item) => sum + item.weight, 0);
-      let rnd = Math.random() * totalWeight;
-      for (const item of weights) {
-        if (rnd < item.weight) return item.num;
-        rnd -= item.weight;
-      }
-    }
+    function drawNumbers(weights, count, allowRepeats) {
+      const results = [];
+      let totalWeight = weights.reduce((acc, w) => acc + w.weight, 0);
 
-    function generateNumbers() {
-      const floor = parseInt(document.getElementById("floor").value);
-      const ceiling = parseInt(document.getElementById("ceiling").value);
-      const N = parseInt(document.getElementById("numDraws").value);
-      const allowRepeats = document.getElementById("allowRepeats").checked;
-      const skipHistory = document.getElementById("skipHistory").checked;
-      const useLuckyProb = document.getElementById("useLuckyProb").checked;
-      const historyInput = document.getElementById("history").value;
-      const historySet = new Set(parseHistory(historyInput));
-
-      const weights = generateWeightedNumbers(floor, ceiling, useLuckyProb);
-
-      let result;
-      let attempts = 0;
-      do {
-        const draws = [];
-        const pool = allowRepeats ? [...weights] : [...weights];
-        for (let i = 0; i < N; i++) {
-          const pick = weightedRandom(pool);
-          draws.push(pick);
-          if (!allowRepeats) {
-            const index = pool.findIndex(w => w.num === pick);
-            if (index !== -1) pool.splice(index, 1);
+      for (let i = 0; i < count; i++) {
+        let rnd = Math.random() * totalWeight;
+        for (let j = 0; j < weights.length; j++) {
+          rnd -= weights[j].weight;
+          if (rnd <= 0) {
+            results.push(weights[j].num);
+            if (!allowRepeats) {
+              totalWeight -= weights[j].weight;
+              weights.splice(j, 1);
+            }
+            break;
           }
         }
-        result = draws.sort((a, b) => a - b).join(',');
-        attempts++;
-      } while (skipHistory && historySet.has(result) && attempts < 1000);
+      }
+      return results;
+    }
 
-      document.getElementById("result").textContent = `Result: ${result}`;
+    function parseHistory(text) {
+      return text.trim().split('\n').map(line => line.trim().split(',').map(n => parseInt(n.trim())).sort((a, b) => a - b).join(','));
+    }
+
+    function generate() {
+      const floor = parseInt(document.getElementById('floor').value);
+      const ceiling = parseInt(document.getElementById('ceiling').value);
+      const numDraws = parseInt(document.getElementById('numDraws').value);
+      const allowRepeats = document.getElementById('allowRepeats').checked;
+      const skipHistory = document.getElementById('skipHistory').checked;
+      const useLuckyProb = document.getElementById('useLuckyProb').checked;
+
+      const historyText = document.getElementById('historyInput').value;
+      const historySet = new Set(parseHistory(historyText));
+
+      let attempt = 0, maxAttempts = 1000;
+      let result;
+      while (attempt < maxAttempts) {
+        const weights = generateWeightedNumbers(floor, ceiling, useLuckyProb);
+        const draw = drawNumbers([...weights], numDraws, allowRepeats).sort((a, b) => a - b);
+        const key = draw.join(',');
+        if (!skipHistory || !historySet.has(key)) {
+          result = draw;
+          break;
+        }
+        attempt++;
+      }
+
+      const output = document.getElementById('output');
+      output.innerText = result ? `Generated: ${result.join(', ')}` : 'Failed to generate a unique result.';
     }
   </script>
 </body>
