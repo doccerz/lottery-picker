@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lottery Generator</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; }
+    textarea { width: 100%; height: 100px; }
+    .result { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Lottery Generator</h1>
+  <label>Range (Floor to Ceiling):</label><br>
+  <input type="number" id="floor" placeholder="Floor" />
+  <input type="number" id="ceiling" placeholder="Ceiling" /><br><br>
+
+  <label>Number of draws:</label><br>
+  <input type="number" id="numDraws" /><br><br>
+
+  <label><input type="checkbox" id="allowRepeats" /> Allow Repeats</label><br>
+  <label><input type="checkbox" id="skipHistory" /> Skip Historical Combinations</label><br>
+  <label><input type="checkbox" id="useLuckyProb" /> Use Lucky Number Probability</label><br><br>
+
+  <label>Historical Winning Combinations (comma-separated):</label><br>
+  <textarea id="history"></textarea><br><br>
+
+  <button onclick="generateNumbers()">Generate</button>
+
+  <div class="result" id="result"></div>
+
+  <script>
+    const luckyNumbers = [28, 16, 39, 32, 15];
+    const unluckyNumbers = [47, 46, 43, 41, 44];
+
+    function parseHistory(input) {
+      return input.trim().split('\n').map(line =>
+        line.split(',').map(n => parseInt(n.trim())).sort((a, b) => a - b).join(',')
+      );
+    }
+
+    function generateWeightedNumbers(floor, ceiling, useLuckyProb) {
+      const weights = [];
+      for (let i = floor; i <= ceiling; i++) {
+        let weight = 1;
+        if (useLuckyProb) {
+          if (luckyNumbers.includes(i)) weight *= 1.2;
+          if (unluckyNumbers.includes(i)) weight *= 0.7;
+        }
+        weights.push({ num: i, weight });
+      }
+      return weights;
+    }
+
+    function weightedRandom(weights) {
+      const totalWeight = weights.reduce((sum, item) => sum + item.weight, 0);
+      let rnd = Math.random() * totalWeight;
+      for (const item of weights) {
+        if (rnd < item.weight) return item.num;
+        rnd -= item.weight;
+      }
+    }
+
+    function generateNumbers() {
+      const floor = parseInt(document.getElementById("floor").value);
+      const ceiling = parseInt(document.getElementById("ceiling").value);
+      const N = parseInt(document.getElementById("numDraws").value);
+      const allowRepeats = document.getElementById("allowRepeats").checked;
+      const skipHistory = document.getElementById("skipHistory").checked;
+      const useLuckyProb = document.getElementById("useLuckyProb").checked;
+      const historyInput = document.getElementById("history").value;
+      const historySet = new Set(parseHistory(historyInput));
+
+      const weights = generateWeightedNumbers(floor, ceiling, useLuckyProb);
+
+      let result;
+      let attempts = 0;
+      do {
+        const draws = [];
+        const pool = allowRepeats ? [...weights] : [...weights];
+        for (let i = 0; i < N; i++) {
+          const pick = weightedRandom(pool);
+          draws.push(pick);
+          if (!allowRepeats) {
+            const index = pool.findIndex(w => w.num === pick);
+            if (index !== -1) pool.splice(index, 1);
+          }
+        }
+        result = draws.sort((a, b) => a - b).join(',');
+        attempts++;
+      } while (skipHistory && historySet.has(result) && attempts < 1000);
+
+      document.getElementById("result").textContent = `Result: ${result}`;
+    }
+  </script>
+</body>
+</html>
