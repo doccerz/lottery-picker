@@ -15,12 +15,26 @@
     h1 {
       text-align: center;
     }
-    label, textarea, input {
-      display: block;
-      margin-bottom: 10px;
-      width: 100%;
-      box-sizing: border-box;
-    }
+    
+/* General rule for inputs and labels */
+label, textarea, input {
+  display: block;
+  margin-bottom: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Override for checkbox labels */
+label.checkbox-label {
+  display: flex;
+  align-items: center;
+  width: auto;
+}
+
+label.checkbox-label input[type="checkbox"] {
+  width: auto;
+  margin-right: 8px;
+}
     textarea {
       height: 100px;
     }
@@ -52,9 +66,20 @@
   <label>Number of Draws (N):</label>
   <input id="numDraws" type="number" value="6" />
 
-  <label><input type="checkbox" id="allowRepeats" /> Allow repeats</label>
-  <label><input type="checkbox" id="skipHistory" /> Skip historical combinations</label>
-  <label><input type="checkbox" id="useLuckyProb" /> Use lucky/unlucky probabilities</label>
+<label class="checkbox-label">
+  <input type="checkbox" id="allowRepeats" />
+  Allow repeats
+</label>
+
+<label class="checkbox-label">
+  <input type="checkbox" id="skipHistory" checked />
+  Skip historical combinations
+</label>
+
+<label class="checkbox-label">
+  <input type="checkbox" id="useLuckyProb" />
+  Use lucky/unlucky probabilities
+</label>
 
   <label>Historical Combinations:</label>
   <textarea id="historyInput"></textarea>
